@@ -1,0 +1,43 @@
+# LOCAL DEVELOPMENT — connects to external/standalone PostgreSQL on the host or a remote server.
+# Run with: docker compose up --build -d
+#
+# Set DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME in your .env file.
+# For host machine PostgreSQL:
+#   DB_HOST=host.docker.internal  (Windows/macOS)
+#   DB_HOST=172.17.0.1            (Linux — or use host.docker.internal with extra_hosts below)
+#
+# For a remote PostgreSQL server:
+#   DB_HOST=your.db.server.com
+#
+# NOTE: No postgres container is included. You must have PostgreSQL running externally.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: backend
+    restart: always
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - PORT=5000
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME}?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
