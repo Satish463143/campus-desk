@@ -1,5 +1,5 @@
 const Joi = require("joi");
-const { Gender, AcademicStatus } = require("../../config/constant.config");
+const { Gender, AcademicStatus, RelationType, Status } = require("../../config/constant.config");
 
 const customAgeValidator = (obj, helpers) => {
   if (obj.dateOfAdmission && obj.dateOfBirth) {
@@ -63,7 +63,7 @@ const parentSchema = Joi.object({
 const familyInfoSchema = Joi.object({
   maritalStatus: Joi.string().allow(null, ""),
   custodyHolder: Joi.string().allow(null, ""),
-  emergencyContact: Joi.string().valid("father", "mother", "guardian").optional().allow(null, ""),
+  emergencyContact: Joi.string().valid(...Object.values(RelationType)).optional().allow(null, ""),
 }).unknown(true);
 
 const studentInfoSchema = Joi.object({
@@ -84,20 +84,20 @@ const createAdmissionDTO = Joi.object({
   firstName: Joi.string().required(),
   surname: Joi.string().required(),
   email: Joi.string().email().required(),
-  phone: Joi.string().required(),
+  phone: Joi.string().allow(null),
   gender: Joi.string().valid(...Object.values(Gender)).required(),
   dateOfBirth: Joi.date().optional().allow(null, ""),
   bloodGroup: Joi.string().optional().allow(null, ""),
   admissionNumber: Joi.string().optional().allow(null, ""),
-  appNo: Joi.string().optional().allow(null, ""),
   dateOfAdmission: Joi.date().optional().allow(null, ""),
-  className: Joi.string().optional().allow(null, ""),
+  className: Joi.string().required(),
+  section: Joi.string().allow(null,""),
   // ✅ IMPORTANT: academicStatus determines the academic tracking status
   // Valid values: active, graduated, dropped, transferred
   // Only 'active' students will have fees and invoices auto-generated
   academicStatus: Joi.string().valid(...Object.values(AcademicStatus)).optional().allow(null, ""),
-  // status mirrors academicStatus so the service can read it from either field name
-  status: Joi.string().valid(...Object.values(AcademicStatus)).optional().allow(null, ""),
+  // set student is either active or inactive
+  status: Joi.string().valid(...Object.values(Status)).optional().allow(null, ""),
   studentInfo: studentInfoSchema.optional().allow(null),
   address: addressSchema.optional().allow(null),
   father: parentSchema.optional().allow(null),
@@ -119,13 +119,14 @@ const updateAdmissionDTO = Joi.object({
   dateOfBirth: Joi.date().optional().allow(null, ""),
   bloodGroup: Joi.string().optional().allow(null, ""),
   admissionNumber: Joi.string().optional().allow(null, ""),
-  appNo: Joi.string().optional().allow(null, ""),
   dateOfAdmission: Joi.date().optional().allow(null, ""),
   className: Joi.string().optional().allow(null, ""),
   // ✅ IMPORTANT: academicStatus represents the academic tracking status
   // Valid values: active, graduated, dropped, transferred
   // This field preserves the actual status chosen by admin
   academicStatus: Joi.string().valid(...Object.values(AcademicStatus)).optional(),
+  // set student is either active or inactive
+  status: Joi.string().valid(...Object.values(Status)).optional(),
   studentInfo: studentInfoSchema.optional().allow(null),
   address: addressSchema.optional().allow(null),
   father: parentSchema.optional().allow(null),

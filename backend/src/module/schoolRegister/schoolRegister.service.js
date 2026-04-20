@@ -1,15 +1,22 @@
 const prisma = require("../../config/db.config")
+const { redisClient } = require("../../config/redis.config")
 
 class SchoolService {
     
     createSchoolAndPrincipal = async (schoolData, principalData) => {
         try {
-            return await prisma.$transaction(async (tx) => {
+            const result = await prisma.$transaction(async (tx) => {
                 const school = await tx.school.create({ data: schoolData });
                 principalData.schoolId = school.id;
                 const principal = await tx.user.create({ data: principalData });
                 return { school, principal };
             });
+
+            // Invalidate cache
+            const keys = await redisClient.keys('schools:list:*');
+            if (keys.length > 0) await redisClient.del(keys);
+
+            return result;
         } catch (exception) {
             console.log('Error in createSchoolAndPrincipal service', exception);
             throw exception;
@@ -19,6 +26,13 @@ class SchoolService {
 
     listSchools = async ({ search = "", limit = 10, skip = 0 }) => {
         try {
+            const cacheKey = `schools:list:search=${search}:limit=${limit}:skip=${skip}`;
+            const cachedSchools = await redisClient.get(cacheKey);
+            
+            if (cachedSchools) {
+                return JSON.parse(cachedSchools);
+            }
+
             const where = search
                 ? { schoolName: { contains: search, mode: "insensitive" } }
                 : {}
@@ -62,7 +76,10 @@ class SchoolService {
                 principal: users[0] ?? null,
             }))
 
-            return { data: schools, count }
+            const result = { data: schools, count };
+            await redisClient.setEx(cacheKey, 600, JSON.stringify(result)); // Cache for 10 minutes
+
+            return result;
 
         } catch (exception) {
             console.log('Error in listSchools service', exception);
@@ -72,9 +89,16 @@ class SchoolService {
 
     getSchoolById = async (id) => {
         try {
+            const cacheKey = `school:${id}`;
+            const cachedSchool = await redisClient.get(cacheKey);
+            if (cachedSchool) return JSON.parse(cachedSchool);
+
             const school = await prisma.school.findUnique({
                 where: { id }
             })
+            if (school) {
+                await redisClient.setEx(cacheKey, 600, JSON.stringify(school));
+            }
             return school
         } catch (exception) {
             console.log('Error in getSchoolById service', exception);
@@ -87,7 +111,11 @@ class SchoolService {
                 where: { id },
                 data: data
             })
+            const keys = await redisClient.keys('schools:list:*');
+            if (keys.length > 0) await redisClient.del(keys);
+            await redisClient.del(`school:${id}`);
             return school
+
         } catch (exception) {
             console.log('Error in updateSchoolProfile service', exception);
             throw exception
@@ -99,6 +127,9 @@ class SchoolService {
                 where: { id },
                 data: data
             })
+            const keys = await redisClient.keys('schools:list:*');
+            if (keys.length > 0) await redisClient.del(keys);
+            await redisClient.del(`school:${id}`);
             return school
         } catch (exception) {
             console.log('Error in updateSchoolStatus service', exception);
@@ -132,7 +163,8 @@ class SchoolService {
             prisma.lMSChapter.deleteMany({ where: { schoolId: id } }),
             prisma.lMSSyllabus.deleteMany({ where: { schoolId: id } }),
             // Fee leaf tables
-            prisma.feeAuditLog.deleteMany({ where: { schoolId: id } }),
+            prisma.auditLog.deleteMany({ where: { schoolId: id } }),
+            prisma.studentFeeAutoLog.deleteMany({ where: { schoolId: id } }),
             prisma.feePaymentAllocation.deleteMany({ where: { schoolId: id } }),
             prisma.feeReminder.deleteMany({ where: { schoolId: id } }),
             prisma.feePayment.deleteMany({ where: { schoolId: id } }),
@@ -141,9 +173,12 @@ class SchoolService {
             prisma.feeStructure.deleteMany({ where: { schoolId: id } }),
             prisma.feeCategory.deleteMany({ where: { schoolId: id } }),
             prisma.feeSetting.deleteMany({ where: { schoolId: id } }),
-            // Invoice / payment gateways
+            // Invoice / payment gateways / admissions / notifications / grades
             prisma.invoice.deleteMany({ where: { schoolId: id } }),
             prisma.schoolPaymentGateway.deleteMany({ where: { schoolId: id } }),
+            prisma.publicAdmission.deleteMany({ where: { schoolId: id } }),
+            prisma.notification.deleteMany({ where: { schoolId: id } }),
+            prisma.gradeScale.deleteMany({ where: { schoolId: id } }),
             // Attendance
             prisma.studentAttendance.deleteMany({ where: { schoolId: id } }),
             prisma.teacherAttendance.deleteMany({ where: { schoolId: id } }),
@@ -176,6 +211,10 @@ class SchoolService {
             // Finally the school itself
             prisma.school.delete({ where: { id } }),
         ]);
+
+        const keys = await redisClient.keys('schools:list:*');
+        if (keys.length > 0) await redisClient.del(keys);
+        await redisClient.del(`school:${id}`);
 
         return { id };
     }

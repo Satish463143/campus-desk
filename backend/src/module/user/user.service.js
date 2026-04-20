@@ -1,4 +1,5 @@
 const prisma = require("../../config/db.config");
+const { redisClient } = require("../../config/redis.config");
 
 // Safe field selection — never expose password hash
 const SAFE_SELECT = {
@@ -38,6 +39,9 @@ class UserService {
     updatePrincipleStatus = async (id, data) => {
         try {
             const user = await prisma.user.update({ where: { id }, data });
+            const keys = await redisClient.keys(`users:list:${user.schoolId}:*`);
+            if (keys.length > 0) await redisClient.del(keys);
+            await redisClient.del(`user:${id}:${user.schoolId}`);
             return user;
         } catch (exception) {
             console.error("[UserService] updatePrincipleStatus:", exception);
@@ -50,7 +54,10 @@ class UserService {
      */
     createUser = async (data) => {
         try {
-            return await prisma.user.create({ data, select: SAFE_SELECT });
+            const user = await prisma.user.create({ data, select: SAFE_SELECT });
+            const keys = await redisClient.keys(`users:list:${user.schoolId}:*`);
+            if (keys.length > 0) await redisClient.del(keys);
+            return user;
         } catch (exception) {
             console.error("[UserService] createUser:", exception);
             throw exception;
@@ -73,6 +80,10 @@ class UserService {
             const safePage  = Math.max(Number(page)  || 1,  1);
             const skip      = (safePage - 1) * safeLimit;
 
+            const cacheKey = `users:list:${schoolId}:${roles.join(",")}:${safePage}:${safeLimit}`;
+            const cachedUsers = await redisClient.get(cacheKey);
+            if (cachedUsers) return JSON.parse(cachedUsers);
+
             const where = { schoolId, role: { in: roles } };
 
             const [data, total] = await prisma.$transaction([
@@ -86,7 +97,9 @@ class UserService {
                 prisma.user.count({ where }),
             ]);
 
-            return { data, total, page: safePage, limit: safeLimit };
+            const result = { data, total, page: safePage, limit: safeLimit };
+            await redisClient.setEx(cacheKey, 600, JSON.stringify(result));
+            return result;
         } catch (exception) {
             console.error("[UserService] listUsers:", exception);
             throw exception;
@@ -101,11 +114,17 @@ class UserService {
      */
     getUserById = async (id, schoolId) => {
         try {
+            const cacheKey = `user:${id}:${schoolId}`;
+            const cachedUser = await redisClient.get(cacheKey);
+            if (cachedUser) return JSON.parse(cachedUser);
+
             const user = await prisma.user.findFirst({
                 where: { id, schoolId },
                 select: SAFE_SELECT,
             });
             if (!user) throw { status: 404, message: "User not found" };
+
+            await redisClient.setEx(cacheKey, 600, JSON.stringify(user));
             return user;
         } catch (exception) {
             console.error("[UserService] getUserById:", exception);
@@ -130,11 +149,17 @@ class UserService {
             const existing = await prisma.user.findFirst({ where: { id, schoolId } });
             if (!existing) throw { status: 404, message: "User not found" };
 
-            return await prisma.user.update({
+            const updatedUser = await prisma.user.update({
                 where: { id },
                 data: safeData,
                 select: SAFE_SELECT,
             });
+
+            const keys = await redisClient.keys(`users:list:${schoolId}:*`);
+            if (keys.length > 0) await redisClient.del(keys);
+            await redisClient.del(`user:${id}:${schoolId}`);
+
+            return updatedUser;
         } catch (exception) {
             console.error("[UserService] updateUser:", exception);
             throw exception;
@@ -153,11 +178,18 @@ class UserService {
             // Strip anything that would elevate privileges
             const { role, status, schoolId, ...safeData } = data;
 
-            return await prisma.user.update({
+            const updatedUser = await prisma.user.update({
                 where: { id },
                 data: safeData,
                 select: SAFE_SELECT,
             });
+
+            const userSchoolId = updatedUser.schoolId;
+            const keys = await redisClient.keys(`users:list:${userSchoolId}:*`);
+            if (keys.length > 0) await redisClient.del(keys);
+            await redisClient.del(`user:${id}:${userSchoolId}`);
+
+            return updatedUser;
         } catch (exception) {
             console.error("[UserService] updateSelf:", exception);
             throw exception;
@@ -176,6 +208,11 @@ class UserService {
             if (!existing) throw { status: 404, message: "User not found" };
 
             await prisma.user.delete({ where: { id } });
+
+            const keys = await redisClient.keys(`users:list:${schoolId}:*`);
+            if (keys.length > 0) await redisClient.del(keys);
+            await redisClient.del(`user:${id}:${schoolId}`);
+
             return { id };
         } catch (exception) {
             console.error("[UserService] deleteUser:", exception);

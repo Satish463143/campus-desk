@@ -31,8 +31,10 @@ class UserController {
         try {
             const { id } = req.params;
             const response = await userService.updatePrincipleStatus(id, req.body);
-            // Invalidate any cached entry for this user
+            // Invalidate any cached entry for this user and the schools list where principal data is embedded
             await clearCache(this.#userKey(id));
+            await clearCache("schools_list_*");   // Layer 1 (Controller)
+            await clearCache("schools:list:*");     // Layer 2 (Service)
             res.json({ result: response, message: "Updated principal status", meta: null });
         } catch (error) {
             console.error("[UserController] updatePrincipalStatus:", error);

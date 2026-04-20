@@ -1,11 +1,25 @@
 const admissionService = require("./admission.service")
-const { clearCache } = require("../../utils/redisCache")
-const prisma = require("../../config/db.config")
-
 class AdmissionController {
     create = async (req, res, next) => {
         try {
-            const result = await admissionService.create(req.body, req.authUser.schoolId)
+            // After persistAllToS3 runs, req.files contains the S3 results keyed by field name.
+            // We extract profileImage and documents URLs and merge them into the body
+            // so the service receives everything in one clean data object.
+            const profileImage = req.files?.profileImage?.[0]?.location ?? null
+            const documents   = (req.files?.documents ?? []).map(f => ({
+                url:         f.location,   // S3 URL set by persistAllToS3
+                key:         f.key,        // S3 object key
+                originalName: f.originalname,
+                mimeType:    f.mimetype,
+            }))
+
+            const body = {
+                ...req.body,
+                profileImage,  // single S3 URL or null
+                documents,     // array of { url, key, originalName, mimeType }
+            }
+
+            const result = await admissionService.create(body, req.authUser.schoolId)
             return res.status(201).json({
                 result,
                 message: "Admission application processed successfully",
@@ -17,76 +31,16 @@ class AdmissionController {
         }
     }
 
-    searchParentByPhone = async (req, res, next) => {
-        try {
-            const { phone } = req.query;
-            if (!phone || String(phone).trim().length < 2) {
-                return res.json({ result: [], message: "Query too short", meta: null });
-            }
-            const q = String(phone).trim();
-            // Match phone starting with the query OR containing it (handles country-code prefixes)
-            const users = await prisma.user.findMany({
-                where: {
-                    schoolId: req.authUser.schoolId,
-                    role: "parent",
-                    phone: { contains: q }
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    phone: true,
-                    parentProfile: {
-                        select: {
-                            id: true,
-                            relationType: true,
-                            occupation: true,
-                            // Pull rich details from the most recent linked student's JSON blobs
-                            students: {
-                                select: {
-                                    father: true,
-                                    mother: true,
-                                    guardian: true,
-                                },
-                                take: 1,
-                                orderBy: { createdAt: "desc" }
-                            }
-                        }
-                    }
-                },
-                take: 10,
-                orderBy: { createdAt: "desc" }
-            });
-            return res.json({ result: users, message: "Parents found", meta: null });
-        } catch (exception) {
-            console.error("searchParentByPhone error:", exception);
-            next(exception);
-        }
-    }
-
-    uploadDocs = async (req, res, next) => {
-        try {
-            const urls = req.body.files || [];
-            return res.json({
-                result: urls,
-                message: "Documents uploaded successfully",
-                meta: null
-            });
-        } catch (err) {
-            next(err);
-        }
-    }
-
     bulkUpload = async (req, res, next) => {
         try {
             if (!req.file) throw { status: 400, message: "No file uploaded" };
-            
+
             const results = [];
             const csv = require('csv-parser');
             const { Readable } = require('stream');
 
             const stream = Readable.from(req.file.buffer);
-            
+
             stream.pipe(csv())
                 .on('data', (data) => results.push(data))
                 .on('end', async () => {
@@ -98,12 +52,12 @@ class AdmissionController {
                         try {
                             const data = {
                                 firstName: row.firstName || "Unknown",
-                                surname: row.surname || "Unknown",
-                                email: row.email || `student_${Date.now()}@test.com`,
-                                phone: row.phone || "0000000000",
-                                gender: row.gender ? row.gender.toLowerCase() : "other",
+                                surname:   row.surname   || "Unknown",
+                                email:     row.email     || `student_${Date.now()}@noreply.local`,
+                                phone:     row.phone     || "0000000000",
+                                gender:    row.gender    ? row.gender.toLowerCase() : "other",
                                 dateOfBirth: row.dateOfBirth || null,
-                                className: row.className || "",
+                                className:   row.className  || "",
                                 fees: {}
                             };
                             await admissionService.create(data, req.authUser.schoolId);
@@ -120,9 +74,8 @@ class AdmissionController {
                         meta: null
                     });
                 })
-                .on('error', (err) => {
-                    next(err);
-                });
+                .on('error', (err) => next(err));
+
         } catch (exception) {
             console.error("bulk upload error:", exception);
             next(exception);

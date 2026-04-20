@@ -36,7 +36,6 @@ const seedUser = async () => {
                 fullAddress: process.env.SEED_ADMIN_ADDRESS || "Biratnagar",
             },
         };
-
         console.log("\n🌱 Seeding admin user...\n");
 
         const existing = await prisma.user.findUnique({

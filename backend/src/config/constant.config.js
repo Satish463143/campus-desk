@@ -41,8 +41,6 @@ const Gender = {
     OTHER:"other"
 }
 const AcademicStatus={
-    ACTIVE:"active",
-    INACTIVE:"inactive",
     PENDING:"pending",
     GRADUATED:"graduated",
     DROPPED:"dropped",

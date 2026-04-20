@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Receipt</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-blue: #1b4d8d;
+            --icon-blue: #0b8ce9;
+            --card-border: #f8ad25;
+            --text-dark: #232a31;
+            --text-light: #525a65;
+            --input-border: #222;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: #ffffff;
+            display: block;
+            margin: 0;
+            padding: 20px 0;
+            min-height: 100vh;
+        }
+
+        .receipt-container {
+            background-color: #dfdddd;
+            width: 100%;
+            max-width: 850px; 
+            height: 340px; 
+            margin: 0 auto; 
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 10px 30px;
+            border-bottom: 2px dashed #cbd5e1; /* Visual separator for cutting */
+            page-break-inside: avoid;
+        }
+
+        .receipt-container:last-child {
+            border-bottom: none;
+        }
+
+        /* Top Header Area */
+        .receipt-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+            z-index: 2;
+            margin-bottom: 12px;
+        }
+
+        .receipt-title {
+            background-color: var(--primary-blue);
+            color: #ffffff;
+            padding: 8px 24px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .header-field {
+            display: flex;
+            align-items: baseline;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .header-field.center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .header-input {
+            border: none;
+            border-bottom: 1px solid var(--input-border);
+            background: transparent;
+            width: 140px;
+            margin-left: 8px;
+            font-family: inherit;
+            font-size: 15px;
+            outline: none;
+            color: var(--text-dark);
+            font-weight: 600;
+            padding-bottom: 2px;
+            text-align: center;
+        }
+
+        /* Main Content Card */
+        .receipt-card {
+            background-color: #ffffff;
+            border: 1.5px solid var(--card-border);
+            border-radius: 10px;
+            padding: 14px 28px;
+            flex: 1;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            column-gap: 60px;
+            row-gap: 10px; 
+        }
+
+        .form-group {
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-dark);
+            white-space: nowrap;
+        }
+
+        .line-input {
+            border: none;
+            border-bottom: 1px solid var(--input-border);
+            background: transparent;
+            font-family: inherit;
+            font-size: 15px;
+            outline: none;
+            flex: 1;
+            margin-left: 8px;
+            color: var(--text-dark);
+            font-weight: 500;
+            padding-bottom: 2px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .radio-group {
+            display: flex;
+            align-items: center;
+            align-self: flex-end;
+            margin-bottom: -2px; 
+        }
+
+        .radio-group-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-dark);
+            margin-right: 16px;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            margin-right: 16px;
+            font-size: 13px;
+            color: var(--text-dark);
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .radio-circle {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: #d1d5db;
+            margin-right: 6px;
+            display: inline-block;
+            transition: all 0.2s;
+        }
+
+        .radio-label input[type="radio"] {
+            display: none;
+        }
+        .radio-label input[type="radio"]:checked + .radio-circle {
+            background-color: var(--icon-blue);
+            box-shadow: inset 0 0 0 3px #ffffff;
+            border: 1px solid var(--icon-blue);
+        }
+
+        .signature-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            column-gap: 60px;
+            margin-top: 4px;
+        }
+
+        /* Bottom Footer Area */
+        .receipt-footer {
+            display: flex;
+            justify-content: center;
+            margin-top: 14px;
+            z-index: 2;
+        }
+
+        .contact-info {
+            display: flex;
+            gap: 40px;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dark);
+            gap: 8px;
+        }
+
+        .icon-circle {
+            background-color: var(--icon-blue);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .icon-circle svg {
+            width: 13px;
+            height: 13px;
+            stroke: #ffffff;
+            stroke-width: 2.5;
+        }
+
+        /* Decorative SVGs at bottom left */
+        .bg-wave {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 200px;
+            height: auto;
+            z-index: 1;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                margin: 0;
+            }
+            .receipt-container {
+                max-width: 100%;
+                box-shadow: none;
+            }
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Receipt 1 -->
+    <div class="receipt-container">
+        <!-- Abstract Waves Background -->
+        <svg class="bg-wave" viewBox="0 0 250 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 0 30 C 80 80 150 120 250 150 L 0 150 Z" fill="#0ea5e9" />
+            <path d="M 0 80 C 60 110 110 130 180 150 L 0 150 Z" fill="#0e3158" />
+        </svg>
+
+        <div class="receipt-header">
+            <div class="receipt-title">Payment Receipt</div>
+            
+            <div class="header-field center">
+                Invoice No: <input type="text" class="header-input">
+            </div>
+            
+            <div class="header-field">
+                Date: <input type="text" class="header-input">
+            </div>
+        </div>
+
+        <div class="receipt-card">
+            <div class="form-grid">
+                <!-- Row 1 -->
+                <div class="form-group">
+                    <label>Payer Name:</label> 
+                    <input type="text" class="line-input">
+                </div>
+                <div class="form-group">
+                    <label>Payment Amount:</label> 
+                    <input type="text" class="line-input">
+                </div>
+                
+                <!-- Row 2 -->
+                <div class="form-group">
+                    <label>Recipient Name:</label> 
+                    <input type="text" class="line-input">
+                </div>
+                <div class="form-group">
+                    <label>Payment Due:</label> 
+                    <input type="text" class="line-input">
+                </div>
+                
+                <!-- Row 3 -->
+                <div class="form-group">
+                    <label>Contact No:</label> 
+                    <input type="text" class="line-input">
+                </div>
+                <div class="form-group">
+                    <label>Payment Purpose:</label> 
+                    <input type="text" class="line-input">
+                </div>
+
+                <!-- Row 4 -->
+                <div class="form-group radio-group full-width">
+                    <span class="radio-group-title">Payment Method:</span>
+                    <label class="radio-label">
+                        <input type="radio" name="method-1" value="cash">
+                        <span class="radio-circle"></span> Cash
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="method-1" value="card">
+                        <span class="radio-circle"></span> Credit Card
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="method-1" value="transfer">
+                        <span class="radio-circle"></span> Transfer
+                    </label>
+
+                    <div style="flex:1;"></div>
+
+                    <label style="font-size: 14px; font-weight: 500; color: var(--text-dark);">Received By:</label> 
+                    <input type="text" class="line-input" style="max-width: 220px;">
+                </div>
+                
+                <!-- Row 5 -->
+                <div class="form-group full-width">
+                    <label>Notes:</label> 
+                    <input type="text" class="line-input">
+                </div>
+            </div>
+
+            <!-- Signatures -->
+            <div class="signature-row">
+                <div class="form-group">
+                    <label>Recipient Signature:</label> 
+                    <input type="text" class="line-input">
+                </div>
+                <div class="form-group">
+                    <label>Payer Signature:</label> 
+                    <input type="text" class="line-input">
+                </div>
+            </div>
+        </div>
+
+        <div class="receipt-footer">
+            <div class="contact-info">
+                <div class="contact-item">
+                    <div class="icon-circle">
+                        <svg viewBox="0 0 24 24" fill="none" class="lucide lucide-phone" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                    </div>
+                    +977,9761293627 9761161753
+                </div>
+                <div class="contact-item">
+                    <div class="icon-circle">
+                        <svg viewBox="0 0 24 24" fill="none" class="lucide lucide-map-pin" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                        </svg>
+                    </div>
+                    Suncity, Pepsicola, Kathmandu
+                </div>
+                <div class="contact-item">
+                    <div class="icon-circle">
+                        <svg viewBox="0 0 24 24" fill="none" class="lucide lucide-globe" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/>
+                        </svg>
+                    </div>
+                    www.scholarlyguide.com
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+</body>
+</html>

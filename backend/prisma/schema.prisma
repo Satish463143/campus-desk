@@ -64,9 +64,8 @@ enum Gender {
 }
 
 enum AcademicStatus {
-  active
+  admitted
   pending
-  inactive
   graduated
   dropped
   transferred
@@ -434,10 +433,9 @@ model StudentProfile {
   gender      Gender?
   bloodGroup  String?
 
-  academicStatus AcademicStatus @default(active)
+  academicStatus AcademicStatus @default(admitted)
 
   // Personal & family info
-  appNo             String?
   dateOfAdmission   DateTime?
   studentInfo       Json?
   father            Json?
@@ -1342,10 +1340,10 @@ model Notification {
 // ============================================================
 
 model PublicAdmission {
-  id String @id @default(uuid())
+  id          String @id @default(uuid())
 
-  schoolId String
-  school   School @relation(fields: [schoolId], references: [id])
+  schoolId    String
+  school      School @relation(fields: [schoolId], references: [id])
 
   firstName   String
   surname     String

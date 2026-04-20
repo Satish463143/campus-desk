@@ -86,6 +86,42 @@ class AuthController {
             next(error)
         }
     }
+    refreshToken = async (req, res, next) => {
+        try {
+            const oldRefreshToken = req.headers.authorization.split(" ")[1];
+            const decoded = jwt.verify(oldRefreshToken, process.env.JWT_SECRET);
+            const user = await userService.getSingleUserByFilter({ id: decoded.sub });
+            const token = jwt.sign({
+                sub: user.id,
+            }, process.env.JWT_SECRET, {
+                expiresIn: "1d"
+            })
+            const refreshToken = jwt.sign({
+                sub: user.id,
+                type: "refresh"
+            }, process.env.JWT_SECRET, {
+                expiresIn: "7d"
+            })
+            res.json({
+                result: {
+                    userDetails: {
+                        id: user.id,
+                        name: user.name,
+                        email: user.email,
+                        role: user.role,
+                        schoolId: user.schoolId,
+                    },
+                    token: { token, refreshToken }
+
+                },
+                message: "User logged in successfully",
+                meta: null
+            })
+        } catch (error) {
+            console.log("refreshToken error", error)
+            next(error)
+        }
+    }
     logout = async (req, res, next) => {
         try {
             // Logout logic depends on how tokens are managed. 

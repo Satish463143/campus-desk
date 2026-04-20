@@ -170,6 +170,8 @@ router.get('/me', loginCheck, authController.getLoggedInUser);
  */
 router.post("/logout", loginCheck, verifyToken, authController.logout);
 
+router.post("/refresh",loginCheck, verifyToken, authController.refreshToken);
+
 /**
  * @openapi
  * /auth/change-password:

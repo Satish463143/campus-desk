@@ -67,72 +67,7 @@ const router = require("express").Router()
 router.route("/")
     .get(loginCheck, attachSchool, hasPermission([Role.PRINCIPAL, Role.ADMIN_STAFF]), parentController.listParents)
 
-/**
- * @openapi
- * /parent/parent-self-update/{id}:
- *   put:
- *     tags: [Parents]
- *     operationId: updateParentSelfProfile
- *     summary: Parent self-update profile
- *     description: >
- *       Parent only. Parents can update their own name, phone, address, and profile image.
- *       Accepts multipart/form-data. Profile image (jpg/jpeg/png/webp, max 5 MB) is uploaded to S3.
- *       NOTE: This route is declared before /:id to avoid being treated as an ID param.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Parent profile UUID (must match authenticated user)
- *     requestBody:
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 example: Shyam Sharma
- *               phone:
- *                 type: string
- *                 example: "9800000011"
- *               profileImage:
- *                 type: string
- *                 format: binary
- *                 description: Profile photo (jpg/jpeg/png/webp, max 5 MB)
- *               "address[province]":
- *                 type: string
- *               "address[district]":
- *                 type: string
- *               "address[fullAddress]":
- *                 type: string
- *     responses:
- *       200:
- *         description: Parent profile updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Profile updated successfully
- *                 result:
- *                   type: object
- *                 meta:
- *                   nullable: true
- *                   example: null
- *       400:
- *         $ref: '#/components/responses/ValidationError'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- */
+
 router.put('/parent-self-update/:id', loginCheck, attachSchool, hasPermission([Role.PARENT]),
     setPath("parent"), uplaodFile(FileFilterType.IMAGE).fields([
         { name: "profileImage", maxCount: 1 }

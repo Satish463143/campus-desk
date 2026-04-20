@@ -18,10 +18,10 @@ app.use(helmet());
 //  CORS (allow cross-origin requests)
 const allowedOrigin = [
     "http://localhost:3000",
-    "http://localhost:5173",
+    "http://localhost:3001",
     "http://localhost:5000",
     "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3001",
     "http://127.0.0.1:5000",
     ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(",") : []),
 ];
@@ -55,8 +55,8 @@ app.use(compression());
 app.use(express.json({limit:"10kb"}));
 app.use(express.urlencoded({ extended: true, limit:"10kb" }));
 
-//routes ✅ FIXED: Added /api prefix
-app.use('/api', router);
+//routes 
+app.use(router);
 
 //swagger
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));

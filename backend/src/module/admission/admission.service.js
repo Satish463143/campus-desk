@@ -7,6 +7,72 @@ const {
   AcademicStatus,
 } = require("../../config/constant.config");
 
+// ─── resolvePeriod ────────────────────────────────────────────────────────────
+// Given a FeeFrequency and a base due date, returns the period window and the
+// actual due date to store on StudentFee.
+//
+//  one_time    → no period window, due date = baseDueDate
+//  monthly     → current calendar month, due = baseDueDate
+//  quarterly   → current quarter (Jan-Mar / Apr-Jun / Jul-Sep / Oct-Dec)
+//  half_yearly → current half  (Jan-Jun / Jul-Dec)
+//  yearly      → current academic year window (Jan 1 – Dec 31)
+function resolvePeriod(frequency, baseDueDate) {
+  const now = new Date();
+  const y   = now.getFullYear();
+  const m   = now.getMonth(); // 0-indexed
+
+  let periodLabel = null;
+  let periodStart = null;
+  let periodEnd   = null;
+  let dueDate     = new Date(baseDueDate);
+
+  switch (frequency) {
+    case "monthly": {
+      periodStart = new Date(y, m, 1);
+      periodEnd   = new Date(y, m + 1, 0); // last day of month
+      periodLabel = `${now.toLocaleString("default", { month: "long" })} ${y}`;
+      break;
+    }
+    case "quarterly": {
+      const q         = Math.floor(m / 3);          // 0,1,2,3
+      const qStartM   = q * 3;
+      periodStart     = new Date(y, qStartM, 1);
+      periodEnd       = new Date(y, qStartM + 3, 0);
+      periodLabel     = `Q${q + 1} ${y}`;
+      dueDate         = new Date(y, qStartM + 3, 0); // end of quarter
+      break;
+    }
+    case "half_yearly": {
+      if (m < 6) {
+        periodStart = new Date(y, 0, 1);
+        periodEnd   = new Date(y, 5, 30);
+        periodLabel = `H1 ${y}`;
+        dueDate     = new Date(y, 5, 30);
+      } else {
+        periodStart = new Date(y, 6, 1);
+        periodEnd   = new Date(y, 11, 31);
+        periodLabel = `H2 ${y}`;
+        dueDate     = new Date(y, 11, 31);
+      }
+      break;
+    }
+    case "yearly": {
+      periodStart = new Date(y, 0, 1);
+      periodEnd   = new Date(y, 11, 31);
+      periodLabel = `${y}`;
+      dueDate     = new Date(y, 11, 31);
+      break;
+    }
+    case "one_time":
+    default: {
+      // No period window — due date stays as baseDueDate
+      break;
+    }
+  }
+
+  return { periodLabel, periodStart, periodEnd, dueDate };
+}
+
 class AdmissionService {
   create = async (data, schoolId) => {
     return await prisma.$transaction(async (tx) => {
@@ -110,12 +176,14 @@ class AdmissionService {
       const studentPhone = data.phone || "";
       const parentPhone = primaryParent.phone || data.phone || "";
 
-      // ─── Determine User Status (from data.status or default to ACTIVE) ────────
-      // The data.status field is for user account status (active/inactive)
-      // The data.academicStatus field is for academic tracking (active/graduated/dropped/etc)
-      // These are independent and should BOTH be preserved as provided
-      const userStatus = Status.ACTIVE; // Always ACTIVE — UserStatus enum only accepts 'active'/'inactive', never academic values like 'pending'
-      const academicStatus = data.academicStatus ?? AcademicStatus.ACTIVE; // ?? preserves 'pending','inactive' etc; only falls back if truly undefined/null
+      // ─── Determine User Status & Academic Status ──────────────────────────────
+      // userStatus   → controls login access (active / inactive) — always ACTIVE on creation
+      // academicStatus → tracks the student's academic lifecycle:
+      //                  admitted | pending | graduated | dropped | transferred | migration
+      //                  NOTE: 'active' and 'inactive' have been removed from AcademicStatus
+      //                  because user account status (UserStatus) already handles that concern.
+      const userStatus = Status.ACTIVE; // Always ACTIVE on creation — account access is separate from academic status
+      const academicStatus = data.academicStatus ?? AcademicStatus.ADMITTED; // Default to ADMITTED when not explicitly provided
 
       // ─── Create User records ──────────────────────────────────────────────────
       const studentUser = await tx.user.create({
@@ -188,6 +256,8 @@ class AdmissionService {
             ...(data.studentInfo || {}),
             studentId: generatedStudentId, // ← persisted here until schema migration
           },
+          profileImage: data.profileImage ?? null,   // S3 URL from multipart upload
+          documents:    data.documents    ?? [],      // [{ url, key, originalName, mimeType }]
           father: data.father
             ? {
                 ...data.father,
@@ -246,20 +316,22 @@ class AdmissionService {
       }
 
       // ─── Fee Management Integration ───────────────────────────────────────────
-      // Only create fees if student is in active academic status
-      if (academicStatus === AcademicStatus.ACTIVE) {
+      // Only auto-assign fees when academicStatus is ADMITTED.
+      // pending / dropped / transferred / graduated / migration → no auto-assignment.
+      //
+      // How it works (mirrors real-world school flow):
+      //   1. School admin creates FeeCategories (Admission Fee, Tuition Fee, Exam Fee, etc.)
+      //   2. Admin sets up FeeStructures per class+academicYear with assignmentType:
+      //        compulsory → auto-assigned to every student on enrollment   ← we pick these
+      //        optional   → accountant manually assigns per student        ← skipped here
+      //   3. On admission, we fetch ALL active compulsory FeeStructures for the class
+      //      and create a StudentFee + StudentFeeAutoLog for each one.
+      if (academicStatus === AcademicStatus.ADMITTED) {
         const academicYear = await tx.academicYear.findFirst({
           where: { schoolId, isActive: true },
         });
-        if (academicYear) {
-          const feeNames = ["Admission Fee", "Tuition Fee"];
-          if (
-            data.fees?.additionalServices &&
-            Array.isArray(data.fees.additionalServices)
-          ) {
-            feeNames.push(...data.fees.additionalServices);
-          }
 
+        if (academicYear) {
           const cls = await tx.class.findFirst({
             where: {
               schoolId,
@@ -269,50 +341,76 @@ class AdmissionService {
           });
 
           if (cls) {
-            const feeStructures = await tx.feeStructure.findMany({
+            // Fetch ALL active compulsory fee structures for this class — no hardcoded names
+            const compulsoryFeeStructures = await tx.feeStructure.findMany({
               where: {
                 schoolId,
                 academicYearId: academicYear.id,
                 classId: cls.id,
                 isActive: true,
-                feeCategory: { name: { in: feeNames } },
+                assignmentType: "compulsory", // ← the only filter that matters
               },
               include: { feeCategory: true },
             });
 
-            const feeSetting = await tx.feeSetting.findFirst({
-              where: { schoolId },
-            });
-            const dueDays = feeSetting?.defaultDueDays ?? 30;
-            const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + dueDays);
-
-            for (const fs of feeStructures) {
-              await tx.studentFee.create({
-                data: {
-                  schoolId,
-                  academicYearId: academicYear.id,
-                  studentId: studentProfile.id,
-                  feeStructureId: fs.id,
-                  originalAmount: fs.amount,
-                  discountAmount: 0,
-                  netAmount: fs.amount,
-                  paidAmount: 0,
-                  balanceAmount: fs.amount,
-                  dueDate,
-                  status: FeeStatus.PENDING,
-                },
+            if (compulsoryFeeStructures.length > 0) {
+              const feeSetting = await tx.feeSetting.findFirst({
+                where: { schoolId },
               });
+              const dueDays = feeSetting?.defaultDueDays ?? 30;
+              const baseDueDate = new Date();
+              baseDueDate.setDate(baseDueDate.getDate() + dueDays);
+
+              for (const fs of compulsoryFeeStructures) {
+                // one_time fees use the base due date
+                // monthly/quarterly/half_yearly/yearly get their own period window
+                const { periodLabel, periodStart, periodEnd, dueDate } =
+                  resolvePeriod(fs.frequency, baseDueDate);
+
+                const studentFee = await tx.studentFee.create({
+                  data: {
+                    schoolId,
+                    academicYearId: academicYear.id,
+                    studentId:      studentProfile.id,
+                    feeStructureId: fs.id,
+                    assignmentType: "compulsory",  // snapshot
+                    assignedById:   null,           // null = system, not a staff member
+                    periodLabel,
+                    periodStart,
+                    periodEnd,
+                    originalAmount: fs.amount,
+                    discountAmount: 0,
+                    netAmount:      fs.amount,
+                    paidAmount:     0,
+                    balanceAmount:  fs.amount,
+                    dueDate,
+                    status: FeeStatus.PENDING,
+                  },
+                });
+
+                // Audit trail — required by StudentFeeAutoLog model
+                await tx.studentFeeAutoLog.create({
+                  data: {
+                    schoolId,
+                    studentId:      studentProfile.id,
+                    feeStructureId: fs.id,
+                    studentFeeId:   studentFee.id,
+                    triggeredBy:    "system_enrollment",
+                    note: `Auto-assigned "${fs.feeCategory.name}" on admission (${admissionNumber})`,
+                  },
+                });
+              }
             }
           }
         }
       }
 
       // ─── Auto-generate Invoice (best-effort) ──────────────────────────────────
+      // Only generate for ADMITTED students — the StudentFees were just created above,
+      // so the invoice service can pick them up immediately.
       try {
         const invoiceService = require("../invoice/invoice.service");
-        // Only auto-generate invoice for active students
-        if (academicStatus === AcademicStatus.ACTIVE) {
+        if (academicStatus === AcademicStatus.ADMITTED) {
           await invoiceService.generateForStudent(
             schoolId,
             studentProfile.id,
