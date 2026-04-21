@@ -6,7 +6,12 @@ export const timetableApi = baseApi.injectEndpoints({
 
     // POST /time-table/bulk  (array of entries)
     bulkCreateTimetable: builder.mutation({
-      query: (body: unknown[]) => ({ url: '/time-table/bulk', method: 'POST', body }),
+      query: ({ entries, academicYearId }: { entries: unknown[]; academicYearId: string }) => ({
+        // Embed academicYearId in the URL — body must be a plain array for the Joi DTO
+        url: `/time-table/bulk?academicYearId=${encodeURIComponent(academicYearId)}`,
+        method: 'POST',
+        body: entries,
+      }),
       invalidatesTags: ['Timetable'],
     }),
 
@@ -18,9 +23,10 @@ export const timetableApi = baseApi.injectEndpoints({
 
     // ── Listing / Filtering ─────────────────────────────────────────────────────
 
-    // GET /time-table?sectionId&classId&dayOfWeek&page&limit
+    // GET /time-table?academicYearId&sectionId&classId&dayOfWeek&page&limit
     getTimetables: builder.query({
       query: (params?: {
+        academicYearId?: string
         sectionId?: string
         classId?: string
         dayOfWeek?: string
@@ -34,31 +40,31 @@ export const timetableApi = baseApi.injectEndpoints({
       providesTags: ['Timetable'],
     }),
 
-    // GET /time-table/section/:sectionId
+    // GET /time-table/section/:sectionId?academicYearId=...
     getSectionTimetable: builder.query({
-      query: (sectionId: string) => ({
-        url: `/time-table/section/${sectionId}`,
+      query: ({ sectionId, academicYearId }: { sectionId: string; academicYearId: string }) => ({
+        url: `/time-table/section/${sectionId}?academicYearId=${encodeURIComponent(academicYearId)}`,
         method: 'GET',
       }),
-      providesTags: (_r, _e, sectionId) => [{ type: 'Timetable', id: `section-${sectionId}` }],
+      providesTags: (_r, _e, { sectionId }) => [{ type: 'Timetable', id: `section-${sectionId}` }],
     }),
 
-    // GET /time-table/teacher/:teacherId
+    // GET /time-table/teacher/:teacherId?academicYearId=...
     getTeacherTimetable: builder.query({
-      query: (teacherId: string) => ({
-        url: `/time-table/teacher/${teacherId}`,
+      query: ({ teacherId, academicYearId }: { teacherId: string; academicYearId: string }) => ({
+        url: `/time-table/teacher/${teacherId}?academicYearId=${encodeURIComponent(academicYearId)}`,
         method: 'GET',
       }),
-      providesTags: (_r, _e, teacherId) => [{ type: 'Timetable', id: `teacher-${teacherId}` }],
+      providesTags: (_r, _e, { teacherId }) => [{ type: 'Timetable', id: `teacher-${teacherId}` }],
     }),
 
-    // GET /time-table/day/:dayOfWeek
+    // GET /time-table/day/:dayOfWeek?academicYearId=...
     getDaySchedule: builder.query({
-      query: (dayOfWeek: string) => ({
-        url: `/time-table/day/${dayOfWeek}`,
+      query: ({ dayOfWeek, academicYearId }: { dayOfWeek: string; academicYearId: string }) => ({
+        url: `/time-table/day/${dayOfWeek}?academicYearId=${encodeURIComponent(academicYearId)}`,
         method: 'GET',
       }),
-      providesTags: (_r, _e, day) => [{ type: 'Timetable', id: `day-${day}` }],
+      providesTags: (_r, _e, { dayOfWeek }) => [{ type: 'Timetable', id: `day-${dayOfWeek}` }],
     }),
 
     // ── Individual Entry ────────────────────────────────────────────────────────

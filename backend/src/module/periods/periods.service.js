@@ -3,54 +3,55 @@ const { getCache, setCache, clearCache } = require("../../utils/redisCache");
 
 class PeriodService {
 
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
   /**
-   * Parse "HH:MM" string + durationMinutes → { startTime: Date, endTime: Date }
-   * Stored on 1970-01-01 so comparisons are time-only.
+   * Parse "HH:MM" startTime + durationMinutes → { startTime, endTime } as "HH:MM" strings.
+   * String comparison on HH:MM is lexicographically correct for 24-hour ordering.
    */
   _resolveTimeBounds(startTimeStr, durationMinutes) {
     const [hh, mm] = startTimeStr.split(":").map(Number);
-    const startTotalMinutes = hh * 60 + mm;
-    const endTotalMinutes   = startTotalMinutes + parseInt(durationMinutes, 10);
+    const startTotal = hh * 60 + mm;
+    const endTotal   = startTotal + parseInt(durationMinutes, 10);
 
-    if (endTotalMinutes > 1440) {
+    if (endTotal > 1440) {
       throw { status: 400, message: "Period exceeds midnight (24:00). Reduce start time or duration." };
     }
 
-    const startTime = new Date("1970-01-01T00:00:00Z");
-    startTime.setUTCMinutes(startTotalMinutes);
-
-    const endTime = new Date("1970-01-01T00:00:00Z");
-    endTime.setUTCMinutes(endTotalMinutes);
-
-    return { startTime, endTime, durationMinutes };
-  }
-
-  /** Convert a stored Date back to "HH:MM" string */
-  _dateToTimeStr(date) {
-    const d = new Date(date);
-    const hh = String(d.getUTCHours()).padStart(2, "0");
-    const mm = String(d.getUTCMinutes()).padStart(2, "0");
-    return `${hh}:${mm}`;
-  }
-
-  /** Enrich a raw period record with human-friendly fields */
-  _format(period) {
-    if (!period) return null;
-    const start = new Date(period.startTime);
-    const end   = new Date(period.endTime);
-    const durationMinutes =
-      (end.getUTCHours() * 60 + end.getUTCMinutes()) -
-      (start.getUTCHours() * 60 + start.getUTCMinutes());
+    const endHH = String(Math.floor(endTotal / 60)).padStart(2, "0");
+    const endMM = String(endTotal % 60).padStart(2, "0");
 
     return {
-      ...period,
-      startTime:       this._dateToTimeStr(period.startTime),
-      endTime:         this._dateToTimeStr(period.endTime),
-      durationMinutes,
+      startTime: startTimeStr.slice(0, 5),  // ensure "HH:MM" (no seconds)
+      endTime:   `${endHH}:${endMM}`,
     };
   }
 
-  // ─── CRUD ───────────────────────────────────────────────────────────────────
+  /**
+   * Compute durationMinutes from two "HH:MM" strings.
+   */
+  _calcDuration(startStr, endStr) {
+    const [sh, sm] = startStr.split(":").map(Number);
+    const [eh, em] = endStr.split(":").map(Number);
+    return (eh * 60 + em) - (sh * 60 + sm);
+  }
+
+  /**
+   * Enrich a raw period record with durationMinutes derived from stored strings.
+   */
+  _format(period) {
+    if (!period) return null;
+    const startTime = period.startTime?.slice(0, 5) ?? "";
+    const endTime   = period.endTime?.slice(0, 5)   ?? "";
+    return {
+      ...period,
+      startTime,
+      endTime,
+      durationMinutes: this._calcDuration(startTime, endTime),
+    };
+  }
+
+  // ─── CRUD ─────────────────────────────────────────────────────────────────
 
   async createPeriod(data) {
     const {
@@ -68,17 +69,18 @@ class PeriodService {
     const academicYear = await prisma.academicYear.findFirst({
       where: { id: academicYearId, schoolId },
     });
-    if (!academicYear) throw { status: 404, message: "Academic year not found" };
+    if (!academicYear) throw { status: 404, message: "Academic year not found." };
 
     // Prevent duplicate period number in same school/year
     const duplicate = await prisma.period.findFirst({
       where: { schoolId, academicYearId, periodNumber },
     });
-    if (duplicate) throw { status: 409, message: "Period number already exists for this academic year" };
+    if (duplicate) throw { status: 409, message: "Period number already exists for this academic year." };
 
-    // Resolve times & check overlap
+    // Resolve HH:MM strings and check overlap
     const { startTime, endTime } = this._resolveTimeBounds(startTimeStr, durationMinutes);
 
+    // Overlap: existing.startTime < newEndTime  AND  existing.endTime > newStartTime
     const overlapping = await prisma.period.findFirst({
       where: {
         schoolId,
@@ -90,7 +92,7 @@ class PeriodService {
     if (overlapping) {
       throw {
         status: 409,
-        message: `Period overlaps with "${overlapping.name}" (${this._dateToTimeStr(overlapping.startTime)} – ${this._dateToTimeStr(overlapping.endTime)})`,
+        message: `Period overlaps with "${overlapping.name}" (${overlapping.startTime} – ${overlapping.endTime})`,
       };
     }
 
@@ -103,16 +105,12 @@ class PeriodService {
   }
 
   async getPeriods({ schoolId, academicYearId, skip = 0, limit = 20, search = "" }) {
-    const where = { schoolId, academicYearId };
+    const where = { schoolId };
+    if (academicYearId) where.academicYearId = academicYearId;
     if (search) where.name = { contains: search, mode: "insensitive" };
 
     const [periods, count] = await Promise.all([
-      prisma.period.findMany({
-        where,
-        orderBy: { periodNumber: "asc" },
-        skip,
-        take: limit,
-      }),
+      prisma.period.findMany({ where, orderBy: { periodNumber: "asc" }, skip, take: limit }),
       prisma.period.count({ where }),
     ]);
 
@@ -121,13 +119,13 @@ class PeriodService {
 
   async getPeriodById({ id, schoolId }) {
     const period = await prisma.period.findFirst({ where: { id, schoolId } });
-    if (!period) throw { status: 404, message: "Period not found" };
+    if (!period) throw { status: 404, message: "Period not found." };
     return this._format(period);
   }
 
   async updatePeriod({ id, schoolId, data }) {
     const period = await prisma.period.findFirst({ where: { id, schoolId } });
-    if (!period) throw { status: 404, message: "Period not found" };
+    if (!period) throw { status: 404, message: "Period not found." };
 
     const { name, periodNumber, startTime: startTimeStr, durationMinutes, isBreak, isActive } = data;
     const updateData = {};
@@ -137,33 +135,35 @@ class PeriodService {
       const duplicate = await prisma.period.findFirst({
         where: { schoolId, academicYearId: period.academicYearId, periodNumber },
       });
-      if (duplicate) throw { status: 409, message: "Period number already exists for this academic year" };
+      if (duplicate) throw { status: 409, message: "Period number already exists for this academic year." };
       updateData.periodNumber = periodNumber;
     }
 
     // Recalculate times if either startTime or duration changed
-    const newStartStr       = startTimeStr       ?? this._dateToTimeStr(period.startTime);
-    const existingDuration  =
-      (new Date(period.endTime).getUTCHours() * 60 + new Date(period.endTime).getUTCMinutes()) -
-      (new Date(period.startTime).getUTCHours() * 60 + new Date(period.startTime).getUTCMinutes());
-    const newDuration       = durationMinutes ?? existingDuration;
-
     if (startTimeStr !== undefined || durationMinutes !== undefined) {
+      // Use existing stored HH:MM strings as fallback — no Date conversion needed
+      const existingDuration = this._calcDuration(
+        period.startTime.slice(0, 5),
+        period.endTime.slice(0, 5)
+      );
+      const newStartStr = startTimeStr ?? period.startTime.slice(0, 5);
+      const newDuration = durationMinutes ?? existingDuration;
+
       const { startTime, endTime } = this._resolveTimeBounds(newStartStr, newDuration);
 
       const overlapping = await prisma.period.findFirst({
         where: {
           schoolId,
           academicYearId: period.academicYearId,
-          id:             { not: id },
-          startTime:      { lt: endTime },
-          endTime:        { gt: startTime },
+          id:        { not: id },
+          startTime: { lt: endTime },
+          endTime:   { gt: startTime },
         },
       });
       if (overlapping) {
         throw {
           status: 409,
-          message: `Period overlaps with "${overlapping.name}" (${this._dateToTimeStr(overlapping.startTime)} – ${this._dateToTimeStr(overlapping.endTime)})`,
+          message: `Period overlaps with "${overlapping.name}" (${overlapping.startTime} – ${overlapping.endTime})`,
         };
       }
 
@@ -182,11 +182,11 @@ class PeriodService {
 
   async deletePeriod({ id, schoolId }) {
     const period = await prisma.period.findFirst({ where: { id, schoolId } });
-    if (!period) throw { status: 404, message: "Period not found" };
+    if (!period) throw { status: 404, message: "Period not found." };
 
     const linkedTimetables = await prisma.timetable.count({ where: { periodId: id } });
     if (linkedTimetables > 0) {
-      throw { status: 400, message: "Cannot delete period — it is linked to timetable entries" };
+      throw { status: 400, message: "Cannot delete period — it is linked to timetable entries." };
     }
 
     await prisma.period.delete({ where: { id } });

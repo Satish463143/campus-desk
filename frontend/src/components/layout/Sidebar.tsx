@@ -44,8 +44,9 @@ const NAV_ITEMS: Record<Role, NavItem[]> = {
     {
       label: 'Academic', icon: BookOpen,
       children: [
+        { label: 'Overview',           href: '/academic',           icon: LayoutDashboard},
         { label: 'Academic Years',     href: '/academic/years',     icon: CalendarDays },
-        { label: 'Classes', href: '/academic/classes',   icon: BookOpen },
+        { label: 'Classes',            href: '/academic/classes',   icon: BookOpen },
         { label: 'Subjects',           href: '/academic/subjects',  icon: BookMarked },
         { label: 'Periods',            href: '/academic/periods',   icon: Clock },
         { label: 'Timetable',          href: '/academic/timetable', icon: CalendarDays },

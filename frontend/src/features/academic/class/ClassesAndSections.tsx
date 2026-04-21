@@ -11,6 +11,7 @@ import { useListClassesQuery, useCreateClassMutation, useUpdateClassMutation } f
 import { useListSectionsQuery, useCreateSectionMutation, useUpdateSectionMutation } from '@/src/store/api/sectionApi'
 import { useListAcademicYearsQuery } from '@/src/store/api/academicYearApi'
 import { useGetTeachersBySectionSubjectsQuery } from '@/src/store/api/subjectApi'
+import TeacherSelect from '@/src/components/TeacherSelect'
 
 // ── Safe array extractor (handles both {result:[]} and {data:[]} shapes) ──────
 function safeArray(data: any): any[] {
@@ -126,6 +127,7 @@ function SectionModal({ initial, fixedClassId, fixedClassName, classes, onClose,
     },
   })
   const [serverError, setServerError] = useState('')
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(initial?.classTeacherId ?? '')
 
   const onSubmit = async (values: SectionFormValues) => {
     setServerError('')
@@ -133,7 +135,7 @@ function SectionModal({ initial, fixedClassId, fixedClassName, classes, onClose,
     // classId is NOT allowed on update — the backend derives it from the existing record
     const body: any = { name: values.name }
     if (values.capacity != null) body.capacity = Number(values.capacity)
-    if (values.classTeacherId?.trim()) body.classTeacherId = values.classTeacherId.trim()
+    if (selectedTeacherId?.trim()) body.classTeacherId = selectedTeacherId.trim()
     try { await onSave(body) }
     catch (err: any) { setServerError(err?.data?.message ?? 'Failed to save.') }
   }
@@ -179,9 +181,13 @@ function SectionModal({ initial, fixedClassId, fixedClassName, classes, onClose,
 
           <div>
             <label className="block text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wide mb-1.5">
-              Class Teacher ID <span className="normal-case font-normal text-[var(--foreground-muted)]">(optional)</span>
+              Class Teacher <span className="normal-case font-normal text-[var(--foreground-muted)]">(optional)</span>
             </label>
-            <input {...register('classTeacherId')} className="erp-input" placeholder="Teacher Profile UUID" />
+            <TeacherSelect
+              value={selectedTeacherId}
+              onChange={setSelectedTeacherId}
+              placeholder="Search & select class teacher…"
+            />
           </div>
 
           {serverError && (

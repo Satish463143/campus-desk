@@ -89,7 +89,7 @@ class TimetableService {
             }
         });
 
-        await clearCache("timetable_*");
+        await clearCache("timetable*");
         return timetable;
     }
 
@@ -127,7 +127,7 @@ class TimetableService {
             skipDuplicates: true
         });
 
-        await clearCache("timetable_*");
+        await clearCache("timetable*");
         return { count: result.count };
     }
 
@@ -213,7 +213,7 @@ class TimetableService {
 
         await prisma.timetable.delete({ where: { id } });
 
-        await clearCache("timetable_*");
+        await clearCache("timetable*");
         return { message: "Timetable entry deleted successfully" };
     }
 

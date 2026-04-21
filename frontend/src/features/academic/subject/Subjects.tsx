@@ -13,6 +13,7 @@ import {
 } from '@/src/store/api/subjectApi'
 import { useListClassesQuery } from '@/src/store/api/classApi'
 import { useListSectionsQuery } from '@/src/store/api/sectionApi'
+import TeacherSelect from '@/src/components/TeacherSelect'
 
 // ── Safe array extractor — handles {result:[]}, {data:[]}, raw array ──────────
 function safeArray(data: any): any[] {
@@ -150,7 +151,7 @@ function SectionTeacherPanel({ sections, subjects }: { sections: any[]; subjects
   const assignments = safeArray(data)
 
   const handleAssign = async () => {
-    if (!subjectId || !teacherId) { setError('Both subject and teacher ID are required.'); return }
+    if (!subjectId || !teacherId) { setError('Both subject and teacher are required.'); return }
     setError('')
     try { await assignTeacher({ sectionId: selectedSectionId, body: { subjectId, teacherId } }).unwrap(); setAssigning(false); setSubjectId(''); setTeacherId('') }
     catch (err: any) { setError(err?.data?.message ?? 'Failed to assign.') }
@@ -188,7 +189,14 @@ function SectionTeacherPanel({ sections, subjects }: { sections: any[]; subjects
             <option value="">Select subject…</option>
             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <input className="erp-input text-sm" placeholder="Teacher Profile UUID" value={teacherId} onChange={e => setTeacherId(e.target.value)} />
+          <div>
+            <label className="block text-xs font-semibold text-[var(--foreground-muted)] mb-1">Teacher</label>
+            <TeacherSelect
+              value={teacherId}
+              onChange={setTeacherId}
+              placeholder="Search & select teacher…"
+            />
+          </div>
           {error && <div className="text-xs text-[var(--danger)]">{error}</div>}
           <div className="flex gap-2">
             <button onClick={handleAssign} className="btn-primary flex-1 text-sm">Assign</button>

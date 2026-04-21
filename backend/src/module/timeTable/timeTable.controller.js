@@ -14,8 +14,22 @@ class TimetableController {
         };
     }
     
-    bulkCreateTimetable = ()=>{
+    bulkCreateTimetable = async (req, res, next) => {
+        try {
+            const schoolId = req.authUser.schoolId;
+            const academicYearId = req.body[0]?.academicYearId || req.query.academicYearId;
 
+            if (!academicYearId) {
+                return res.status(400).json({ success: false, message: "academicYearId is required in each entry or as a query param" });
+            }
+
+            const dataArray = req.body; // validated array by bulkCreateTimetableDTO
+            const result = await timetableService.bulkCreateTimetable(schoolId, academicYearId, dataArray);
+
+            res.status(201).json(this._buildResponse(result, `${result.count} timetable entries created successfully`, 201));
+        } catch (error) {
+            next(error);
+        }
     }
 
     createTimetable = async (req, res, next) => {

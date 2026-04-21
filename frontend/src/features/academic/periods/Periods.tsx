@@ -1,11 +1,15 @@
 'use client'
 import React, { useState } from 'react'
-import { Clock, Plus, Pencil, Trash2, AlertCircle, X, Coffee, CheckCircle2, XCircle } from 'lucide-react'
+import { Clock, Plus, Pencil, Trash2, AlertCircle, X, Coffee } from 'lucide-react'
 import { useGetPeriodsQuery, useCreatePeriodMutation, useUpdatePeriodMutation, useDeletePeriodMutation } from '@/src/store/api/periodApi'
 import { useListAcademicYearsQuery } from '@/src/store/api/academicYearApi'
+import { useEffect } from 'react'
 
+// ── Universal safe array extractor ────────────────────────────────────────
 function safeArray(data: any): any[] {
-  const r = data?.result; return Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : [])
+  if (!data) return []
+  const r = data.result ?? data.data ?? data
+  return Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : [])
 }
 
 function calcEndTime(start: string, mins: number): string {
@@ -146,12 +150,25 @@ export default function Periods() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const { data: yearsData } = useListAcademicYearsQuery({ limit: 50 })
-  const { data, isLoading } = useGetPeriodsQuery({ academicYearId: yearFilter || undefined, limit: 100 })
+
+  const years = safeArray(yearsData)
+
+  // Always default to the active year (backend requires academicYearId)
+  useEffect(() => {
+    if (!yearFilter && years.length > 0) {
+      const active = years.find((y: any) => y.isActive) ?? years[0]
+      if (active) setYearFilter(active.id)
+    }
+  }, [years.length])
+
+  const { data, isLoading } = useGetPeriodsQuery(
+    { academicYearId: yearFilter, limit: 100 },
+    { skip: !yearFilter }   // don't fire until we have a yearId
+  )
   const [create, { isLoading: creating }] = useCreatePeriodMutation()
   const [update, { isLoading: updating }] = useUpdatePeriodMutation()
   const [deletePeriod] = useDeletePeriodMutation()
 
-  const years = safeArray(yearsData)
   const periods = safeArray(data)
   const sorted = [...periods].sort((a, b) => a.periodNumber - b.periodNumber)
 

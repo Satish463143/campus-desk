@@ -117,7 +117,7 @@ class SubjectService {
         if (existing)   throw { status: 409, message: "Subject is already assigned to this class." }
 
         return prisma.classSubject.create({
-            data: { classId, subjectId },
+            data: { schoolId, classId, subjectId },
             select: {
                 id:      true,
                 class:   { select: { id: true, name: true } },
