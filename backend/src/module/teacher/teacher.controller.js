@@ -73,8 +73,9 @@ class TeacherController {
             const page = Math.max(parseInt(req.query.page) || 1, 1)
             const skip = (page - 1) * limit
             const search = req.query.search?.trim() || ""
+            const status = req.query.status?.trim() || ""
 
-            const cacheKey = `teachers_list_p${page}_l${limit}_s${search}_school${req.authUser.schoolId}`
+            const cacheKey = `teachers_list_p${page}_l${limit}_s${search}_st${status}_school${req.authUser.schoolId}`
             const cachedData = await getCache(cacheKey)
 
             if (cachedData) {
@@ -87,9 +88,12 @@ class TeacherController {
 
             const filter = {
                 schoolId: req.authUser.schoolId,
-                ...(search && {
-                    user: { name: { contains: search, mode: "insensitive" } }
-                })
+            }
+            
+            if (search || status) {
+                filter.user = {}
+                if (search) filter.user.name = { contains: search, mode: "insensitive" }
+                if (status) filter.user.status = status
             }
 
             const { data, count } = await teacherService.listTeachers(filter, limit, skip)

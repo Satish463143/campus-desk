@@ -390,42 +390,57 @@ export default function Teachers() {
       </div>
 
       {/* ── Search & Filters ── */}
-      <div className="erp-card flex flex-col gap-3">
-        <div className="flex gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--foreground-muted)]" />
+      <div className="erp-card flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 items-center w-full">
+          {/* Search Bar */}
+          <div className="relative flex-1 w-full sm:min-w-[300px]">
             <input
-              className="erp-input pl-9"
-              placeholder="Search by name or email…"
+              className="erp-input pl-10 w-full"
+              placeholder="Search by name, email, or department…"
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1) }}
             />
           </div>
+
+          {/* Quick Status Filter */}
           <select
-            className="erp-input w-auto"
+            className="erp-input w-full sm:w-auto"
             value={statusFilter}
             onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
           >
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
+            <option value="">All Statuses</option>
+            <option value="active">🟢 Active</option>
+            <option value="inactive">🔴 Inactive</option>
           </select>
+
+          {/* Toggle More Filters */}
           <button
             onClick={() => setShowFilters(f => !f)}
-            className={`btn-ghost flex items-center gap-2 text-sm ${showFilters ? 'text-[var(--primary)]' : ''}`}
+            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-[var(--radius-md)] border-2 text-sm font-semibold transition-all w-full sm:w-auto ${
+              showFilters 
+                ? 'bg-[var(--primary-light)] border-[var(--primary)] text-[var(--primary)]' 
+                : 'bg-transparent border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--primary)]'
+            }`}
           >
-            <Filter size={14} />
-            More Filters
-            {deptFilter && <span className="w-2 h-2 rounded-full bg-[var(--primary)]" />}
+            <Filter size={16} />
+            Filters
+            {deptFilter && (
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[var(--primary)] text-white text-[10px]">
+                1
+              </span>
+            )}
           </button>
         </div>
 
+        {/* Advanced Filters Panel */}
         {showFilters && (
-          <div className="flex flex-wrap gap-3 pt-2 border-t border-[var(--border)]">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-[var(--foreground-muted)] font-semibold">Department</label>
+          <div className="flex flex-wrap items-end gap-4 pt-4 border-t border-[var(--border)] animate-fade-in">
+            <div className="flex flex-col gap-1.5 flex-1 sm:flex-none sm:min-w-[200px]">
+              <label className="text-xs text-[var(--foreground-muted)] font-bold uppercase tracking-wide">
+                Department
+              </label>
               <select
-                className="erp-input w-auto"
+                className="erp-input w-full"
                 value={deptFilter}
                 onChange={e => setDeptFilter(e.target.value)}
               >
@@ -433,15 +448,14 @@ export default function Teachers() {
                 {departments.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
-            {(deptFilter) && (
-              <div className="flex items-end">
-                <button
-                  onClick={() => setDeptFilter('')}
-                  className="btn-ghost text-xs flex items-center gap-1 text-[var(--danger)]"
-                >
-                  <X size={12} /> Clear filters
-                </button>
-              </div>
+            
+            {deptFilter && (
+              <button
+                onClick={() => setDeptFilter('')}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-[var(--danger)] hover:bg-[var(--danger-bg)] rounded-[var(--radius-md)] transition-all"
+              >
+                <X size={14} /> Clear Filter
+              </button>
             )}
           </div>
         )}

@@ -178,7 +178,7 @@ export default function Timetable() {
               title={!sectionId ? 'Select a class & section first' : 'Add new timetable entry'}
               className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus size={16} /> Add Entry
+              <Plus size={16} /> Add Bulk Entry
             </button>
           )}
         </div>

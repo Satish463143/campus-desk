@@ -12,8 +12,8 @@ class UserController {
     // ─── helpers ───────────────────────────────────────────────────────────
 
     /** Cache key for a paginated list scoped to caller role */
-    #listKey = (schoolId, callerRole, page, limit) =>
-        `users:${schoolId}:${callerRole}:${page}:${limit}`;
+    #listKey = (schoolId, callerRole, page, limit, search, status) =>
+        `users:${schoolId}:${callerRole}:${page}:${limit}:${search}:${status}`;
 
     /** Cache key for a single user */
     #userKey = (id) => `user:${id}`;
@@ -93,20 +93,20 @@ class UserController {
     listUsers = async (req, res, next) => {
         try {
             const { schoolId, role: callerRole } = req.authUser;
-            const { page = 1, limit = 20 } = req.query;
+            const { page = 1, limit = 20, search = "", status = "" } = req.query;
 
             const roles = this.#visibleRoles(callerRole);
             if (!roles) {
                 return res.status(403).json({ message: "Not authorized to list users" });
             }
 
-            const cacheKey = this.#listKey(schoolId, callerRole, page, limit);
+            const cacheKey = this.#listKey(schoolId, callerRole, page, limit, search, status);
             const cached = await getCache(cacheKey);
             if (cached) {
                 return res.json({ result: cached, message: "Users fetched (cache)", meta: null });
             }
 
-            const result = await userService.listUsers(schoolId, roles, page, limit);
+            const result = await userService.listUsers(schoolId, roles, page, limit, search, status);
             await setCache(cacheKey, result, LIST_TTL);
 
             res.json({ result, message: "Users fetched", meta: null });

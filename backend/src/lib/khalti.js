@@ -1,9 +1,3 @@
-/**
- * Khalti v2 (KPG-2) payment helper
- *
- * Uses only Node built-ins (https) — no extra dependencies.
- */
-
 const https = require("https");
 const { URL } = require("url");
 

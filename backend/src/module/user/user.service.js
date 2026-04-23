@@ -74,17 +74,19 @@ class UserService {
      * @param {number}   limit     - Records per page (max 100)
      * @returns {{ data: User[], total: number, page: number, limit: number }}
      */
-    listUsers = async (schoolId, roles, page = 1, limit = 20) => {
+    listUsers = async (schoolId, roles, page = 1, limit = 20, search = "", status = "") => {
         try {
             const safeLimit = Math.min(Number(limit) || 20, 100);
             const safePage  = Math.max(Number(page)  || 1,  1);
             const skip      = (safePage - 1) * safeLimit;
 
-            const cacheKey = `users:list:${schoolId}:${roles.join(",")}:${safePage}:${safeLimit}`;
+            const cacheKey = `users:list:${schoolId}:${roles.join(",")}:${safePage}:${safeLimit}:${search}:${status}`;
             const cachedUsers = await redisClient.get(cacheKey);
             if (cachedUsers) return JSON.parse(cachedUsers);
 
-            const where = { schoolId, role: { in: roles } };
+            let where = { schoolId, role: { in: roles } };
+            if (search) where.name = { contains: search, mode: 'insensitive' };
+            if (status) where.status = status;
 
             const [data, total] = await prisma.$transaction([
                 prisma.user.findMany({
