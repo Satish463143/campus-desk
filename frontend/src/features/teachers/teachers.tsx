@@ -89,7 +89,7 @@ function TeacherDrawer({ id, onClose, onEdit }: { id: string; onClose: () => voi
         ) : teacher ? (
           <>
             {/* Drawer header */}
-            <div className="relative bg-gradient-to-br from-[var(--primary)] to-[var(--secondary)] p-6 pb-16">
+            <div className="relative bg-gradient-to-br from-[var(--primary)] to-[var(--secondary)] p-6 pb-6">
               <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
                 <X size={16} className="text-white" />
               </button>
@@ -104,7 +104,7 @@ function TeacherDrawer({ id, onClose, onEdit }: { id: string; onClose: () => voi
             </div>
 
             {/* Quick stats */}
-            <div className="-mt-10 mx-4 grid grid-cols-3 gap-2 mb-4">
+            <div className="mt-6 mx-4 grid grid-cols-3 gap-2 mb-4">
               {[
                 { label: 'Experience', value: teacher?.experienceYears != null ? `${teacher.experienceYears}y` : '—', icon: TrendingUp },
                 { label: 'Emp ID', value: teacher?.employeeId || '—', icon: Briefcase },

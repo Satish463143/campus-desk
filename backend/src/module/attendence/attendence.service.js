@@ -435,6 +435,7 @@ class AttendanceService {
         date: normalizedDate,
       },
       select: {
+        id: true,
         studentId: true,
         status: true,
         remark: true,
@@ -457,6 +458,7 @@ class AttendanceService {
       }
 
       sparseMap.get(row.studentId).push({
+        id: row.id,
         period: row.period,
         status: row.status,
         remark: row.remark,

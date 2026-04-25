@@ -33,5 +33,11 @@ const userStatus = {
     ACTIVE: 'active',
     INACTIVE: 'inactive'
 }
+const attendanceStatus = {
+    PRESENT: 'present',
+    ABSENT: 'absent',
+    LATE: 'late',
+    LEAVE: 'leave'
+} as const;
 
-export { schoolStatus, role, userStatus, dayOfWeek, classMode }
+export { schoolStatus, role, userStatus, dayOfWeek, classMode, attendanceStatus }
