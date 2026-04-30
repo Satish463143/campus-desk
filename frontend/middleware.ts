@@ -63,7 +63,7 @@ const ROLE_ROUTES: Record<string, string[]> = {
   teacher: [
     '/dashboard',
     '/timetable',
-    '/attendance',
+    '/teacher-attendance',
     '/lms',
     '/progress',
     '/notifications',

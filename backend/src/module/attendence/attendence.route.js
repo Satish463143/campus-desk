@@ -634,4 +634,33 @@ router.get(
   attendanceController.getTeacherAttendance
 );
 
+// ------------------------------------------------------------------
+// ANALYTICS / SUMMARY ROUTES (Principal Dashboard)
+// ------------------------------------------------------------------
+
+router.get(
+  "/student/school-summary",
+  loginCheck,
+  attachSchool,
+  hasPermission([Role.PRINCIPAL, Role.ADMIN_STAFF]),
+  attendanceController.getSchoolAttendanceSummary
+);
+
+router.get(
+  "/student/class-summary",
+  loginCheck,
+  attachSchool,
+  hasPermission([Role.PRINCIPAL, Role.ADMIN_STAFF, Role.TEACHER]),
+  attendanceController.getClassAttendanceSummary
+);
+
+router.get(
+  "/teacher/summary",
+  loginCheck,
+  attachSchool,
+  hasPermission([Role.PRINCIPAL, Role.ADMIN_STAFF]),
+  attendanceController.getTeacherAttendanceSummary
+);
+
 module.exports = router;
+

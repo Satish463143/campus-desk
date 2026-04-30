@@ -1,6 +1,6 @@
 import { attendanceStatus } from '@/src/config/constant'
 
-export type AttendanceTab = 'student' | 'teacher'
+export type AttendanceTab = 'student' | 'teacher' | 'reports'
 
 
 export interface AttendanceFilterState {

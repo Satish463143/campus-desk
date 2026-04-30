@@ -11,3 +11,8 @@
 npx prisma format
 npx prisma migrate dev --name update-payment-schema
 npx prisma generate
+
+### Stop Background Docker container
+1. Open Command Prompt as Administrator
+2. taskkill /F /IM "Docker Desktop.exe"
+3. taskkill /F /IM "com.docker.backend.exe"

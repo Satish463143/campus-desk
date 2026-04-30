@@ -135,6 +135,8 @@ export const baseApi = createApi({
     'LMSLiveClass',
     'LMSExam',
     'LMSExamSubmission',
+    'LMSAnnouncement',
+    'LMSDiscussion',
     'Notification',
     'ProgressReport',
     'Admission',

@@ -119,6 +119,36 @@ export const attendanceApi = baseApi.injectEndpoints({
       }),
       providesTags: ['Attendance'],
     }),
+
+    // ------------------------------------------------------------------
+    // ANALYTICS / PRINCIPAL DASHBOARD ROUTES
+    // ------------------------------------------------------------------
+    getSchoolAttendanceSummary: builder.query<any, { academicYearId?: string; from?: string; to?: string }>({
+      query: (params) => ({
+        url: '/attendance/student/school-summary',
+        method: 'GET',
+        params,
+      }),
+      providesTags: ['Attendance'],
+    }),
+
+    getClassAttendanceSummary: builder.query<any, { academicYearId?: string; classId?: string; sectionId?: string; from?: string; to?: string }>({
+      query: (params) => ({
+        url: '/attendance/student/class-summary',
+        method: 'GET',
+        params,
+      }),
+      providesTags: ['Attendance'],
+    }),
+
+    getTeacherAttendanceSummary: builder.query<any, { from?: string; to?: string }>({
+      query: (params) => ({
+        url: '/attendance/teacher/summary',
+        method: 'GET',
+        params,
+      }),
+      providesTags: ['Attendance'],
+    }),
   }),
 })
 
@@ -137,4 +167,10 @@ export const {
   useMarkTeacherAttendanceMutation,
   useGetTeacherAttendanceQuery,
   useLazyGetTeacherAttendanceQuery,
+  useGetSchoolAttendanceSummaryQuery,
+  useLazyGetSchoolAttendanceSummaryQuery,
+  useGetClassAttendanceSummaryQuery,
+  useLazyGetClassAttendanceSummaryQuery,
+  useGetTeacherAttendanceSummaryQuery,
+  useLazyGetTeacherAttendanceSummaryQuery,
 } = attendanceApi

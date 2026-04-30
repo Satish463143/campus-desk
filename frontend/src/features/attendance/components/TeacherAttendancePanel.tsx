@@ -8,7 +8,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import Swal from 'sweetalert2'
 import { useGetTeacherAttendanceQuery, useMarkTeacherAttendanceMutation } from '../../../store/api/attendanceApi'
 import { AttendanceFilterState, AttendanceStatus } from '../types/attendance.types'
-import { attendanceStatus } from '@/src/config/constant'
+import { attendanceStatus, role } from '@/src/config/constant'
 
 const teacherAttendanceSchema = yup.object().shape({
   teacherId: yup.string().required('Teacher ID is required'),
@@ -38,7 +38,7 @@ export function TeacherAttendancePanel({ filters }: TeacherAttendancePanelProps)
   const [markTeacherAttendance, { isLoading: isSubmitting }] = useMarkTeacherAttendanceMutation()
   
   const user = useAppSelector((state: any) => state.user.loggedInUser)
-  const isTeacher = user?.role === 'TEACHER'
+  const isTeacher = user?.role === role.TEACHER
 
   const { data: teachersData, isFetching: isTeachersLoading } = useListTeachersQuery({ limit: 500 })
   const teachers = teachersData?.result || teachersData?.data || []
@@ -52,7 +52,7 @@ export function TeacherAttendancePanel({ filters }: TeacherAttendancePanelProps)
     resolver: yupResolver(teacherAttendanceSchema),
     defaultValues: {
       teacherId: '', // Ideally a select, using text input since we lack teacherApi right now
-      status: 'PRESENT' as AttendanceStatus,
+      status: attendanceStatus.PRESENT as AttendanceStatus,
       remark: '',
       checkInTime: '',
       checkOutTime: '',
@@ -60,14 +60,14 @@ export function TeacherAttendancePanel({ filters }: TeacherAttendancePanelProps)
   })
 
   // Auto-set teacherId if logged in user is a teacher
-  useEffect(() => {
-    if (isTeacher && teachers.length > 0) {
-      const teacher = teachers.find((t: any) => t.user?.id === user?.id || t.user?._id === user?.id)
-      if (teacher || user?.teacherId) {
-        setValue('teacherId', teacher?.id || user?.teacherId)
-      }
-    }
-  }, [isTeacher, teachers, user, setValue])
+  // useEffect(() => {
+  //   if (isTeacher && teachers.length > 0) {
+  //     const teacher = teachers.find((t: any) => t.user?.id === user?.id || t.user?._id === user?.id)
+  //     if (teacher || user?.teacherId) {
+  //       setValue('teacherId', teacher?.id || user?.teacherId)
+  //     }
+  //   }
+  // }, [isTeacher, teachers, user, setValue])
 
   const onSubmit = async (data: any) => {
     try {
@@ -139,10 +139,10 @@ export function TeacherAttendancePanel({ filters }: TeacherAttendancePanelProps)
               Status
             </label>
             <select {...register('status')} className="erp-input w-full">
-              <option value="PRESENT">PRESENT</option>
-              <option value="ABSENT">ABSENT</option>
-              <option value="LATE">LATE</option>
-              <option value="LEAVE">LEAVE</option>
+              <option value={attendanceStatus.PRESENT}>PRESENT</option>
+              <option value={attendanceStatus.ABSENT}>ABSENT</option>
+              <option value={attendanceStatus.LATE}>LATE</option>
+              <option value={attendanceStatus.LEAVE}>LEAVE</option>
             </select>
           </div>
 
@@ -218,10 +218,10 @@ export function TeacherAttendancePanel({ filters }: TeacherAttendancePanelProps)
 
 function StatusBadge({ status }: { status: string }) {
   let color = 'bg-gray-100 text-gray-600'
-  if (status === 'PRESENT') color = 'bg-green-100 text-green-700'
-  if (status === 'ABSENT') color = 'bg-red-100 text-red-700'
-  if (status === 'LATE') color = 'bg-yellow-100 text-yellow-700'
-  if (status === 'LEAVE') color = 'bg-blue-100 text-blue-700'
+  if (status === attendanceStatus.PRESENT) color = 'bg-green-100 text-green-700'
+  if (status === attendanceStatus.ABSENT) color = 'bg-red-100 text-red-700'
+  if (status === attendanceStatus.LATE) color = 'bg-yellow-100 text-yellow-700'
+  if (status === attendanceStatus.LEAVE) color = 'bg-blue-100 text-blue-700'
 
   return (
     <span className={`inline-flex items-center justify-center font-medium rounded-full px-2.5 py-1 text-xs ${color}`}>

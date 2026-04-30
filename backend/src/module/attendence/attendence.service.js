@@ -812,6 +812,309 @@ class AttendanceService {
 
     return { data, count };
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Analytics / Summary Methods (Principal Dashboard)
+  |--------------------------------------------------------------------------
+  */
+
+  /**
+   * School-wide attendance summary grouped by class.
+   * Returns for each class: total enrolled, present count, absent count,
+   * late count, leave count, and the attendance percentage.
+   */
+  async getSchoolAttendanceSummary(schoolId, academicYearId, from, to) {
+    const fromDate = from
+      ? this.normalizeDate(from)
+      : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const toDate = to ? this.normalizeDate(to) : this.normalizeDate(new Date());
+
+    const cacheKey = `attendance:${schoolId}:school-summary:${academicYearId}:${fromDate.toISOString().slice(0, 10)}:${toDate.toISOString().slice(0, 10)}`;
+    const cached = await getCache(cacheKey);
+    if (cached) return cached;
+
+    // Fetch all classes for this school/academicYear
+    const classes = await prisma.class.findMany({
+      where: { schoolId, ...(academicYearId ? { sections: { some: { academicYearId } } } : {}) },
+      select: {
+        id: true,
+        name: true,
+        sections: {
+          where: academicYearId ? { academicYearId } : {},
+          select: {
+            id: true,
+            name: true,
+            _count: { select: { enrollments: { where: academicYearId ? { academicYearId } : {} } } },
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    // Fetch non-present attendance records in this date range
+    const attendanceWhere = {
+      schoolId,
+      date: { gte: fromDate, lte: toDate },
+      ...(academicYearId ? { academicYearId } : {}),
+    };
+
+    const attendanceRows = await prisma.studentAttendance.groupBy({
+      by: ["classId", "status"],
+      where: attendanceWhere,
+      _count: { status: true },
+    });
+
+    // Build a map: classId -> { ABSENT: n, LATE: n, LEAVE: n }
+    const statusMap = {};
+    for (const row of attendanceRows) {
+      if (!statusMap[row.classId]) statusMap[row.classId] = {};
+      statusMap[row.classId][row.status] = row._count.status;
+    }
+
+    // Count total working days (distinct dates) per class
+    const distinctDatesPerClass = await prisma.studentAttendance.findMany({
+      where: attendanceWhere,
+      select: { classId: true, date: true },
+      distinct: ["classId", "date"],
+    });
+
+    const workingDaysMap = {};
+    for (const row of distinctDatesPerClass) {
+      if (!workingDaysMap[row.classId]) workingDaysMap[row.classId] = new Set();
+      workingDaysMap[row.classId].add(row.date.toISOString().slice(0, 10));
+    }
+
+    const result = classes.map((cls) => {
+      const totalEnrolled = cls.sections.reduce((sum, s) => sum + s._count.enrollments, 0);
+      const statusData = statusMap[cls.id] || {};
+      const absentCount = statusData["absent"] || 0;
+      const lateCount = statusData["late"] || 0;
+      const leaveCount = statusData["leave"] || 0;
+      const workingDays = workingDaysMap[cls.id]?.size || 0;
+      const totalExpected = totalEnrolled * workingDays;
+      const nonPresentCount = absentCount + leaveCount;
+      const presentCount = Math.max(0, totalExpected - nonPresentCount);
+      const attendancePct = totalExpected > 0 ? Math.round((presentCount / totalExpected) * 100) : 100;
+
+      return {
+        classId: cls.id,
+        className: cls.name,
+        sections: cls.sections.map((s) => ({ id: s.id, name: s.name, enrolled: s._count.enrollments })),
+        totalEnrolled,
+        workingDays,
+        presentCount,
+        absentCount,
+        lateCount,
+        leaveCount,
+        attendancePct,
+      };
+    });
+
+    await setCache(cacheKey, result, 300);
+    return result;
+  }
+
+  /**
+   * Per-student attendance summary for a specific class/section and date range.
+   */
+  async getClassAttendanceSummary(schoolId, academicYearId, classId, sectionId, from, to) {
+    const fromDate = from
+      ? this.normalizeDate(from)
+      : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const toDate = to ? this.normalizeDate(to) : this.normalizeDate(new Date());
+
+    const cacheKey = `attendance:${schoolId}:class-summary:${classId}:${sectionId || "all"}:${fromDate.toISOString().slice(0, 10)}:${toDate.toISOString().slice(0, 10)}`;
+    const cached = await getCache(cacheKey);
+    if (cached) return cached;
+
+    const enrollmentWhere = {
+      ...(classId ? { student: { enrollments: { some: { classId } } } } : {}),
+      ...(sectionId ? { sectionId } : {}),
+      ...(academicYearId ? { academicYearId } : {}),
+    };
+
+    const enrollments = await prisma.studentEnrollment.findMany({
+      where: {
+        ...(sectionId ? { sectionId } : {}),
+        ...(classId && !sectionId ? { section: { classId } } : {}),
+        ...(academicYearId ? { academicYearId } : {}),
+      },
+      select: {
+        studentId: true,
+        student: {
+          select: {
+            id: true,
+            user: { select: { name: true, profileImage: true } },
+          },
+        },
+      },
+      distinct: ["studentId"],
+      orderBy: { studentId: "asc" },
+    });
+
+    // Fetch non-present records for these students
+    const studentIds = enrollments.map((e) => e.studentId);
+    if (studentIds.length === 0) {
+      await setCache(cacheKey, [], 300);
+      return [];
+    }
+
+    const attendanceRows = await prisma.studentAttendance.groupBy({
+      by: ["studentId", "status"],
+      where: {
+        schoolId,
+        studentId: { in: studentIds },
+        date: { gte: fromDate, lte: toDate },
+      },
+      _count: { status: true },
+    });
+
+    // Count working days
+    const workingDaysRows = await prisma.studentAttendance.findMany({
+      where: {
+        schoolId,
+        ...(sectionId ? { sectionId } : classId ? { classId } : {}),
+        date: { gte: fromDate, lte: toDate },
+      },
+      select: { date: true },
+      distinct: ["date"],
+    });
+    const workingDays = workingDaysRows.length;
+
+    const statusMap = {};
+    for (const row of attendanceRows) {
+      if (!statusMap[row.studentId]) statusMap[row.studentId] = {};
+      statusMap[row.studentId][row.status] = row._count.status;
+    }
+
+    const result = enrollments.map(({ studentId, student }) => {
+      const statusData = statusMap[studentId] || {};
+      const absentCount = statusData["absent"] || 0;
+      const lateCount = statusData["late"] || 0;
+      const leaveCount = statusData["leave"] || 0;
+      const presentCount = Math.max(0, workingDays - absentCount - leaveCount);
+      const attendancePct = workingDays > 0 ? Math.round((presentCount / workingDays) * 100) : 100;
+
+      return {
+        studentId,
+        studentName: student.user.name,
+        profileImage: student.user.profileImage,
+        workingDays,
+        presentCount,
+        absentCount,
+        lateCount,
+        leaveCount,
+        attendancePct,
+      };
+    });
+
+    await setCache(cacheKey, result, 300);
+    return result;
+  }
+
+  /**
+   * Aggregated teacher attendance summary for all teachers in a date range.
+   */
+  async getTeacherAttendanceSummary(schoolId, from, to) {
+    const fromDate = from
+      ? this.normalizeDate(from)
+      : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const toDate = to ? this.normalizeDate(to) : this.normalizeDate(new Date());
+
+    const cacheKey = `attendance:${schoolId}:teacher-summary:${fromDate.toISOString().slice(0, 10)}:${toDate.toISOString().slice(0, 10)}`;
+    const cached = await getCache(cacheKey);
+    if (cached) return cached;
+
+    const teacherRows = await prisma.teacherAttendance.groupBy({
+      by: ["teacherId", "status"],
+      where: {
+        schoolId,
+        date: { gte: fromDate, lte: toDate },
+      },
+      _count: { status: true },
+    });
+
+    const statusMap = {};
+    for (const row of teacherRows) {
+      if (!statusMap[row.teacherId]) statusMap[row.teacherId] = {};
+      statusMap[row.teacherId][row.status] = row._count.status;
+    }
+
+    const teacherIds = Object.keys(statusMap);
+
+    // Get latest check-in/out for each teacher in range
+    const latestRecords = await prisma.teacherAttendance.findMany({
+      where: {
+        schoolId,
+        teacherId: { in: teacherIds },
+        date: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        teacherId: true,
+        date: true,
+        checkInTime: true,
+        checkOutTime: true,
+        teacher: {
+          select: {
+            id: true,
+            user: { select: { name: true, profileImage: true } },
+          },
+        },
+      },
+      orderBy: { date: "desc" },
+    });
+
+    const teacherInfoMap = {};
+    const latestRecordMap = {};
+    for (const rec of latestRecords) {
+      if (!teacherInfoMap[rec.teacherId]) {
+        teacherInfoMap[rec.teacherId] = rec.teacher;
+      }
+      if (!latestRecordMap[rec.teacherId]) {
+        latestRecordMap[rec.teacherId] = {
+          checkInTime: rec.checkInTime,
+          checkOutTime: rec.checkOutTime,
+        };
+      }
+    }
+
+    const totalDays = await prisma.teacherAttendance.findMany({
+      where: { schoolId, date: { gte: fromDate, lte: toDate } },
+      select: { date: true },
+      distinct: ["date"],
+    });
+    const workingDays = totalDays.length;
+
+    const result = teacherIds.map((teacherId) => {
+      const statusData = statusMap[teacherId] || {};
+      const presentCount = (statusData["present"] || 0) + (statusData["late"] || 0);
+      const absentCount = statusData["absent"] || 0;
+      const lateCount = statusData["late"] || 0;
+      const leaveCount = statusData["leave"] || 0;
+      const markedDays = presentCount + absentCount + leaveCount;
+      const attendancePct = workingDays > 0 ? Math.round((presentCount / workingDays) * 100) : 100;
+      const latest = latestRecordMap[teacherId] || {};
+
+      return {
+        teacherId,
+        teacherName: teacherInfoMap[teacherId]?.user?.name || teacherId,
+        profileImage: teacherInfoMap[teacherId]?.user?.profileImage || null,
+        workingDays,
+        markedDays,
+        presentCount,
+        absentCount,
+        lateCount,
+        leaveCount,
+        attendancePct,
+        lastCheckIn: latest.checkInTime,
+        lastCheckOut: latest.checkOutTime,
+      };
+    });
+
+    await setCache(cacheKey, result, 300);
+    return result;
+  }
 }
 
-module.exports = new AttendanceService();
+module.exports = new AttendanceService();

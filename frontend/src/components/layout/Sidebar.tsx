@@ -122,7 +122,7 @@ const NAV_ITEMS: Record<Role, NavItem[]> = {
   teacher: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Timetable', href: '/timetable', icon: CalendarDays },
-    { label: 'Attendance', href: '/attendance', icon: UserCheck },
+    { label: 'Attendance', href: '/teacher-attendance', icon: UserCheck },
     {
       label: 'LMS', icon: BookMarked,
       children: [

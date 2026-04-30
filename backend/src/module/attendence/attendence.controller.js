@@ -199,6 +199,64 @@ class AttendanceController {
       next(error);
     }
   };
+
+  getSchoolAttendanceSummary = async (req, res, next) => {
+    try {
+      const schoolId = req.authUser.schoolId;
+      const { academicYearId, from, to } = req.query;
+
+      const result = await attendanceService.getSchoolAttendanceSummary(schoolId, academicYearId, from, to);
+
+      res.json({
+        result,
+        message: "School attendance summary fetched successfully",
+        meta: null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getClassAttendanceSummary = async (req, res, next) => {
+    try {
+      const schoolId = req.authUser.schoolId;
+      const { academicYearId, classId, sectionId, from, to } = req.query;
+
+      const result = await attendanceService.getClassAttendanceSummary(
+        schoolId,
+        academicYearId,
+        classId,
+        sectionId,
+        from,
+        to
+      );
+
+      res.json({
+        result,
+        message: "Class attendance summary fetched successfully",
+        meta: null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getTeacherAttendanceSummary = async (req, res, next) => {
+    try {
+      const schoolId = req.authUser.schoolId;
+      const { from, to } = req.query;
+
+      const result = await attendanceService.getTeacherAttendanceSummary(schoolId, from, to);
+
+      res.json({
+        result,
+        message: "Teacher attendance summary fetched successfully",
+        meta: null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
-module.exports = new AttendanceController();
+module.exports = new AttendanceController();
