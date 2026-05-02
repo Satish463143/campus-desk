@@ -1,8 +1,5 @@
 'use client'
-
-import React, { useMemo } from 'react'
 import { useAppSelector } from '../../store/hooks'
-import { useListTeachersQuery } from '../../store/api/teacherApi'
 import { useTeacherAttendanceFilters } from './hooks/useTeacherAttendanceFilters'
 import { TeacherAttendanceHeader } from './components/TeacherAttendanceHeader'
 import { TeacherSummaryCards } from './components/TeacherSummaryCards'
@@ -33,44 +30,8 @@ export default function TeacherAttendancePage({ schoolId, onClose }: TeacherAtte
 
   console.log('loggedInUser', loggedInUser)
 
-  // Resolve the teacher's profile ID by matching user ID against the teacher list
-  const { data: teachersData, isFetching: isLoadingTeachers } = useListTeachersQuery(
-    { limit: 500 },
-    { skip: !loggedInUserId }
-  )
-
-  const teachers: any[] = useMemo(() => {
-    if (!teachersData) return []
-    const r = teachersData.result ?? teachersData.data ?? teachersData
-    return Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : [])
-  }, [teachersData])
-
-  const teacherProfile = useMemo(() => {
-    if (!loggedInUserId || teachers.length === 0) return null
-    return (
-      teachers.find(
-        (t: any) =>
-          t.user?.id === loggedInUserId ||
-          t.user?._id === loggedInUserId ||
-          t.userId === loggedInUserId
-      ) || null
-    )
-  }, [teachers, loggedInUserId])
-
-  const teacherId: string | null = teacherProfile?.id || loggedInUserId || null
-  const teacherName: string = teacherProfile?.user?.name || loggedInUser?.name || 'Teacher'
-
-  // Loading state — wait for teacher profile resolution
-  if (isLoadingTeachers) {
-    return (
-      <div className="p-6  mx-auto flex items-center justify-center min-h-[300px]">
-        <div className="flex flex-col items-center gap-3 text-gray-400">
-          <Loader2 size={32} className="animate-spin text-blue-500" />
-          <p className="text-sm">Loading your profile...</p>
-        </div>
-      </div>
-    )
-  }
+  const teacherId: string | null = loggedInUser?.teacherProfileId || null
+  const teacherName: string = loggedInUser?.name || 'Teacher'
 
   // If teacher profile not found (e.g. not a teacher role)
   if (!teacherId) {
@@ -87,7 +48,6 @@ export default function TeacherAttendancePage({ schoolId, onClose }: TeacherAtte
               {JSON.stringify({
                 loggedInUser_Is_Null: !loggedInUser,
                 loggedInUserId: loggedInUserId,
-                teachers_Array_Length: teachers.length,
                 teacherId_Evaluated_To: teacherId
               }, null, 2)}
             </pre>
@@ -96,7 +56,6 @@ export default function TeacherAttendancePage({ schoolId, onClose }: TeacherAtte
       </div>
     )
   }
-
   return (
     <div className="p-6 mx-auto">
       {/* Header with timetable-derived filters */}

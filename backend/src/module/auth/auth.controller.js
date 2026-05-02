@@ -40,6 +40,7 @@ class AuthController {
 
                 let studentProfileId = null;
                 let parentProfileId = null;
+                let teacherProfileId = null;
                 if (user.role === "student") {
                     const sp = await prisma.studentProfile.findFirst({ where: { userId: user.id } });
                     studentProfileId = sp?.id ?? null;
@@ -47,6 +48,10 @@ class AuthController {
                 if (user.role === "parent") {
                     const pp = await prisma.parentProfile.findFirst({ where: { userId: user.id } });
                     parentProfileId = pp?.id ?? null;
+                }
+                if (user.role === "teacher") {
+                    const tp = await prisma.teacherProfile.findFirst({ where: { userId: user.id } });
+                    teacherProfileId = tp?.id ?? null;
                 }
 
                 res.json({
@@ -59,9 +64,9 @@ class AuthController {
                             schoolId: user.schoolId,
                             studentProfileId,
                             parentProfileId,
+                            teacherProfileId,
                         },
                         token: { token, refreshToken }
-
                     },
                     message: "User logged in successfully",
                     meta: null
@@ -102,6 +107,22 @@ class AuthController {
             }, process.env.JWT_SECRET, {
                 expiresIn: "7d"
             })
+            let studentProfileId = null;
+            let parentProfileId = null;
+            let teacherProfileId = null;
+            if (user.role === "student") {
+                const sp = await prisma.studentProfile.findFirst({ where: { userId: user.id } });
+                studentProfileId = sp?.id ?? null;
+            }
+            if (user.role === "parent") {
+                const pp = await prisma.parentProfile.findFirst({ where: { userId: user.id } });
+                parentProfileId = pp?.id ?? null;
+            }
+            if (user.role === "teacher") {
+                const tp = await prisma.teacherProfile.findFirst({ where: { userId: user.id } });
+                teacherProfileId = tp?.id ?? null;
+            }
+
             res.json({
                 result: {
                     userDetails: {
@@ -110,9 +131,11 @@ class AuthController {
                         email: user.email,
                         role: user.role,
                         schoolId: user.schoolId,
+                        studentProfileId,
+                        parentProfileId,
+                        teacherProfileId,
                     },
                     token: { token, refreshToken }
-
                 },
                 message: "User logged in successfully",
                 meta: null

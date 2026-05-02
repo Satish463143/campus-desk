@@ -1,6 +1,4 @@
-// features/auth/hooks/useLoginForm.ts
 'use client'
-
 import { useRouter } from 'next/navigation'
 import { useAppDispatch } from '../../../store/hooks'
 import { useLoginMutation } from '../../../store/api/authApi'

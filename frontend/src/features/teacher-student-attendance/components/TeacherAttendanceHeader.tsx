@@ -4,8 +4,6 @@ import React, { useEffect, useMemo } from 'react'
 import { TeacherAttendanceFilterState, TeacherAttendanceTab, TimetableSlot } from '../types/attendance.types'
 import { useListAcademicYearsQuery } from '../../../store/api/academicYearApi'
 import { useGetTeacherTimetableQuery } from '../../../store/api/timetableApi'
-import { useListTeachersQuery } from '../../../store/api/teacherApi'
-import { useAppSelector } from '../../../store/hooks'
 import { BookOpen, User } from 'lucide-react'
 import { dayOfWeek } from '@/src/config/constant'
 
@@ -61,13 +59,13 @@ export function TeacherAttendanceHeader({
     { teacherId: teacherId as string, academicYearId: filters.academicYearId as string },
     { skip: !teacherId || !filters.academicYearId }
   )
+  console.log('timetableData', timetableData)
 
-  console.log('timetableData', timetableData, 'timetableError', timetableError, 'skip args:', { teacherId, academicYearId: filters.academicYearId })
+
 
   const allSlots: TimetableSlot[] = Array.isArray(timetableData)
     ? timetableData
     : (timetableData?.result || timetableData?.data || [])
-  console.log('allSlots', allSlots)
 
   // Filter slots for selected date's day of week
   const selectedDay = getDayOfWeek(filters.date)

@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 const jwt = require("jsonwebtoken")
 const userService = require("../module/user/user.service");
@@ -28,6 +27,7 @@ const loginCheck = async (req, res, next) => {
 
         let studentProfileId = null;
         let parentProfileId = null;
+        let teacherProfileId = null;
 
         if (user.role === "student") {
             const sp = await prisma.studentProfile.findFirst({ where: { userId: user.id } });
@@ -37,7 +37,10 @@ const loginCheck = async (req, res, next) => {
             const pp = await prisma.parentProfile.findFirst({ where: { userId: user.id } });
             parentProfileId = pp?.id ?? null;
         }
-
+        if (user.role === "teacher") {
+            const tp = await prisma.teacherProfile.findFirst({ where: { userId: user.id } });
+            teacherProfileId = tp?.id ?? null;
+        }
         req.authUser = {
             id: user.id,
             name: user.name,
@@ -47,6 +50,7 @@ const loginCheck = async (req, res, next) => {
             schoolId:user.schoolId,
             studentProfileId,
             parentProfileId,
+            teacherProfileId,
         };
         next();
     } catch (exception) {
